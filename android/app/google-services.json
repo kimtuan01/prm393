@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1025261500030",
+    "project_id": "prm393-af7f0",
+    "storage_bucket": "prm393-af7f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1025261500030:android:85c395c28a1ddd34198a2f",
+        "android_client_info": {
+          "package_name": "com.example.expense_tracker_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoPeylBhdpAGiMW-3DDlpK2TVut1ddPPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1025261500030:android:abce0c958b98a2c7198a2f",
+        "android_client_info": {
+          "package_name": "com.example.prm393"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoPeylBhdpAGiMW-3DDlpK2TVut1ddPPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

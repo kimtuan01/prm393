@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ================= USERS =================
+    match /users/{userId} {
+      // Allow anyone to read (for login from other devices)
+      allow read: if true;
+      // Allow write if authenticated or for initial registration
+      allow write: if true;
+      
+      // User's transactions sub-collection
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+      
+      // User's budgets sub-collection
+      match /budgets/{budgetId} {
+        allow read, write: if true;
+      }
+      
+      // User's wallets sub-collection
+      match /wallets/{walletId} {
+        allow read, write: if true;
+      }
+      
+      // User's categories sub-collection
+      match /categories/{categoryId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // ================= LEGACY COLLECTIONS (if used) =================
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    
+    match /budgets/{budgetId} {
+      allow read, write: if true;
+    }
+    
+    match /wallets/{walletId} {
+      allow read, write: if true;
+    }
+    
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+    
+    // ================= CATCH-ALL =================
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
