@@ -138,52 +138,92 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     setState(() => _isLoadingTransactions = true);
 
     final dateRange = _getDateRangeForPeriod(_selectedTimePeriod);
+
     var transactions = await _transactionService.getTransactionsByDateRange(
       dateRange['start'] as DateTime,
       dateRange['end'] as DateTime,
       userId: userId,
     );
 
-    // Wallet filter by walletId
+    /// Filter theo ví
     if (_selectedWalletId != 'all') {
       transactions = transactions
           .where((t) => (t.walletId ?? '') == _selectedWalletId)
           .toList();
     }
 
+    /// Filter theo ngày nếu đang ở mode Ngày
     if (_timeRangeType == 'Ngày') {
       final selectedDay = DateTime(
         _selectedTimePeriod.year,
         _selectedTimePeriod.month,
         _selectedTimePeriod.day,
       );
+
       transactions = transactions.where((t) {
         final d = DateTime(t.date.year, t.date.month, t.date.day);
         return d == selectedDay;
       }).toList();
     }
 
-    final income = transactions
-        .where((t) => t.type == model.TransactionType.income)
-        .fold<double>(0, (sum, t) => sum + t.amount);
+    /// ===============================
+    /// TÍNH SUMMARY
+    /// ===============================
 
-    final expense = transactions
-        .where((t) => t.type == model.TransactionType.expense)
-        .fold<double>(0, (sum, t) => sum + t.amount);
+    double income = 0;
+    double expense = 0;
+    double balance = 0;
+
+    for (final t in transactions) {
+      switch (t.type) {
+
+      /// Khoản thu thực tế
+        case model.TransactionType.income:
+          income += t.amount;
+          balance += t.amount;
+          break;
+
+      /// Khoản chi thực tế
+        case model.TransactionType.expense:
+          expense += t.amount;
+          balance -= t.amount;
+          break;
+
+      /// Đi vay → tiền vào ví nhưng không phải income thực
+        case model.TransactionType.loanIn:
+          balance += t.amount;
+          break;
+
+      /// Cho vay → tiền rời ví nhưng không phải expense thực
+        case model.TransactionType.loanOut:
+          balance -= t.amount;
+          break;
+      }
+    }
+
+    /// ===============================
+    /// GROUP DATA
+    /// ===============================
 
     final grouped = _timeRangeType == 'Quý' || _timeRangeType == 'Năm'
         ? TransactionGroupingService.groupTransactionsByMonth(transactions)
         : TransactionGroupingService.groupTransactionsByDate(transactions);
 
     final groupedByCategory =
-        TransactionGroupingService.groupTransactionsByCategory(transactions);
+    TransactionGroupingService.groupTransactionsByCategory(transactions);
+
+    /// ===============================
+    /// UPDATE STATE
+    /// ===============================
 
     setState(() {
       _totalIncome = income;
       _totalExpense = expense;
-      _balance = income - expense;
+      _balance = balance;
+
       _groupedTransactions = grouped;
       _groupedByCategory = groupedByCategory;
+
       _isLoadingTransactions = false;
     });
   }

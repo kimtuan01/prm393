@@ -28,8 +28,36 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
+
   int _selectedTab = 0; // 0: Khoản chi, 1: Khoản thu, 2: Vay/Nợ
   String _selectedCategory = '';
+  model.TransactionType? _selectedLoanType;
+  model.TransactionType? _mapLoanTypeFromCategory(String category) {
+
+    final c = category.trim().toLowerCase();
+
+    switch (c) {
+
+      case "vay":
+        return model.TransactionType.loanIn;
+
+      case "thu hồi nợ":
+      case "thu hồi":
+      case "thu":
+        return model.TransactionType.loanIn;
+
+      case "cho vay":
+        return model.TransactionType.loanOut;
+
+      case "nợ":
+      case "trả nợ":
+      case "no":
+        return model.TransactionType.loanOut;
+
+      default:
+        return null;
+    }
+  }
   String _amount = '0';
   final FocusNode _amountFocusNode = FocusNode();
   final TextEditingController _amountController = TextEditingController(
@@ -261,7 +289,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       ),
     );
   }
-
+  
   Alignment _getTabAlignment() {
     switch (_selectedTab) {
       case 0:
@@ -282,10 +310,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
+
           setState(() {
+
             _selectedTab = index;
+
             _loadCategoriesFromHive();
+
+            if (index != 2) {
+              _selectedLoanType = null;
+            }
+
           });
+
         },
         child: SizedBox(
           height: 52,
@@ -403,7 +440,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     final c = _categories[index];
                     return InkWell(
                       onTap: () {
-                        setState(() => _selectedCategory = c.name);
+
+                        setState(() {
+
+                          _selectedCategory = c.name;
+
+                          if (_selectedTab == 2) {
+                            _selectedLoanType = _mapLoanTypeFromCategory(c.name);
+                          }
+
+                        });
+
                         Navigator.pop(sheetContext);
                       },
                       child: Column(
@@ -478,7 +525,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               decimal: true,
               signed: false,
             ),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+            ],
             textAlign: TextAlign.right,
             cursorColor: AppTheme.primaryTeal,
             style: TextStyle(
@@ -517,8 +566,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
             onChanged: (value) {
+              final cleanValue = value.replaceAll(',', '');
+              final formatted = _formatNumber(cleanValue);
+              if (formatted != value) {
+                _amountController.value = TextEditingValue(
+                  text: formatted,
+                  selection: TextSelection.collapsed(
+                    offset: formatted.length,
+                  ),
+                );
+              }
               setState(() {
-                _amount = value.isEmpty ? '0' : value;
+                _amount = cleanValue.isEmpty ? '0' : cleanValue;
               });
             },
           ),
@@ -740,42 +799,94 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _saveTransaction() async {
-    final amountValue = double.parse(_amount.replaceAll(',', ''));
 
-    final type = _selectedTab == 0
-        ? model.TransactionType.expense
-        : _selectedTab == 1
-        ? model.TransactionType.income
-        : model.TransactionType.loan;
-
-    final auth = context.read<AuthService>();
-    final userId = auth.currentUser?.id ?? '';
-
-    // Require explicit wallet selection — do not auto-assign
-    if (_selectedWalletId == null || _selectedWalletId!.isEmpty) {
-      AppNotification.showError(context, 'Vui lòng chọn ví');
-      return;
-    }
-
-    final tx = model.Transaction(
-      id: const Uuid().v4(),
-      amount: amountValue,
-      category: _selectedCategory,
-      note: _noteController.text,
-      date: _selectedDate,
-      type: type,
-      createdAt: DateTime.now(),
-      userId: userId,
-      walletId: _selectedWalletId,
-    );
-
-    final notifier = context.read<TransactionNotifier>();
     try {
-      await notifier.addTransactionAndNotify(tx);
-      if (mounted) Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      AppNotification.showError(context, e.toString());
+
+      final amountValue =
+      double.parse(_amount.replaceAll(',', ''));
+
+      if (amountValue <= 0) {
+        AppNotification.showError(context, "Số tiền không hợp lệ");
+        return;
+      }
+
+      if (_selectedWalletId == null) {
+        AppNotification.showError(context, "Chọn ví");
+        return;
+      }
+
+      model.TransactionType type;
+
+      switch (_selectedTab) {
+
+        case 0:
+          type = model.TransactionType.expense;
+          break;
+
+        case 1:
+          type = model.TransactionType.income;
+          break;
+
+        case 2:
+
+          if (_selectedLoanType == null) {
+            AppNotification.showError(
+                context,
+                "Chọn loại vay"
+            );
+            return;
+          }
+
+          type = _selectedLoanType!;
+          break;
+
+        default:
+          type = model.TransactionType.expense;
+      }
+
+      final auth = context.read<AuthService>();
+
+      final userId = auth.currentUser?.id ?? "";
+
+      final transaction = model.Transaction(
+
+        id: const Uuid().v4(),
+
+        amount: amountValue,
+
+        category: _selectedCategory,
+
+        note: _noteController.text.trim(),
+
+        date: _selectedDate,
+
+        type: type,
+
+        createdAt: DateTime.now(),
+
+        updatedAt: DateTime.now(),
+
+        userId: userId,
+
+        walletId: _selectedWalletId,
+      );
+
+      await context.read<TransactionNotifier>()
+          .addTransactionAndNotify(transaction);
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+
+    }
+    catch (e) {
+
+      debugPrint("SAVE ERROR: $e");
+
+      AppNotification.showError(
+          context,
+          "Không thể lưu giao dịch"
+      );
     }
   }
 

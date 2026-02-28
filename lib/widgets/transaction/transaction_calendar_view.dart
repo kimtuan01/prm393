@@ -41,10 +41,16 @@ class TransactionCalendarView extends StatelessWidget {
           final incomeTotal = TransactionGroupingService.sumByType(
             entry.value,
             model.TransactionType.income,
+          ) + TransactionGroupingService.sumByType(
+            entry.value,
+            model.TransactionType.loanIn,
           );
           final expenseTotal = TransactionGroupingService.sumByType(
             entry.value,
             model.TransactionType.expense,
+          ) + TransactionGroupingService.sumByType(
+            entry.value,
+            model.TransactionType.loanOut,
           );
 
           return Card(
@@ -88,7 +94,8 @@ class TransactionCalendarView extends StatelessWidget {
                   const SizedBox(height: 8),
                   Column(
                     children: entry.value.take(4).map((tx) {
-                      final isIncome = tx.type == model.TransactionType.income;
+                      final isIncome = tx.type == model.TransactionType.income ||
+                          tx.type == model.TransactionType.loanIn;
                       final amountText =
                           (isIncome ? '+' : '-') +
                           currencyFormat.format(tx.amount.abs());

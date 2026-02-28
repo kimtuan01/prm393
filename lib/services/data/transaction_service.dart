@@ -36,7 +36,11 @@ class TransactionService {
     await _box!.put(transaction.id, transaction);
 
     // Apply to wallet balances
-    await walletService.applyTransaction(transaction);
+    await walletService.applyTransaction(
+      transaction.walletId!,
+      transaction.amount,
+      transaction.type,
+    );
 
     // 🌐 CLOUD SYNC: Upload to Firebase asynchronously
     _syncService.syncAllPendingTransactions();
@@ -120,7 +124,11 @@ class TransactionService {
     transaction.updatedAt = DateTime.now();
     await _box!.put(transaction.id, transaction);
 
-    await walletService.applyTransaction(transaction);
+    await walletService.applyTransaction(
+      transaction.walletId!,
+      transaction.amount,
+      transaction.type,
+    );
 
     // 🌐 CLOUD SYNC: Upload changes to Firebase
     _syncService.syncAllPendingTransactions();

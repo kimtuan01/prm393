@@ -127,9 +127,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     final categoryIcon = CategoryHelper.getCategoryIcon(
       widget.transaction.category,
     );
-    final isIncome = widget.transaction.type == model.TransactionType.income;
+    final txType = widget.transaction.type;
+    final isPositive = txType == model.TransactionType.income ||
+        txType == model.TransactionType.loanIn;
     final amountText =
-        (isIncome ? '+' : '-') +
+        (isPositive ? '+' : '-') +
         widget.currencyFormat.format(widget.transaction.amount.abs());
     final dateStr = DateFormat('dd/MM/yyyy').format(widget.transaction.date);
     final timeStr = DateFormat('HH:mm').format(widget.transaction.date);
@@ -221,14 +223,14 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: isIncome
+                                color: isPositive
                                     ? AppTheme.accentGreen
                                     : Colors.red,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              isIncome ? 'Thu nhập' : 'Chi tiêu',
+                              _getTypeLabel(txType),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.grey[600],
@@ -283,6 +285,19 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ),
             ),
     );
+  }
+
+  String _getTypeLabel(model.TransactionType type) {
+    switch (type) {
+      case model.TransactionType.income:
+        return 'Thu nhập';
+      case model.TransactionType.expense:
+        return 'Chi tiêu';
+      case model.TransactionType.loanIn:
+        return 'Đi vay';
+      case model.TransactionType.loanOut:
+        return 'Cho vay';
+    }
   }
 
   Widget _buildDetailRow({

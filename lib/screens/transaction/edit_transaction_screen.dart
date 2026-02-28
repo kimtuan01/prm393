@@ -50,13 +50,18 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   void _initializeFromTransaction() {
     final tx = widget.transaction;
 
-    // Set tab based on transaction type (handle loan as separate tab)
-    if (tx.type == model.TransactionType.loan) {
-      _selectedTab = 2;
-    } else if (tx.type == model.TransactionType.income) {
-      _selectedTab = 1;
-    } else {
-      _selectedTab = 0;
+    // Set tab based on transaction type enum
+    switch (tx.type) {
+      case model.TransactionType.income:
+        _selectedTab = 1;
+        break;
+      case model.TransactionType.loanIn:
+      case model.TransactionType.loanOut:
+        _selectedTab = 2;
+        break;
+      case model.TransactionType.expense:
+        _selectedTab = 0;
+        break;
     }
 
     // Set category
@@ -665,11 +670,31 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final userId = authService.currentUser?.id ?? '';
 
-      final txType = _selectedTab == 0
-          ? model.TransactionType.expense
-          : _selectedTab == 1
-          ? model.TransactionType.income
-          : model.TransactionType.loan;
+      model.TransactionType txType;
+      if (_selectedTab == 0) {
+        txType = model.TransactionType.expense;
+      } else if (_selectedTab == 1) {
+        txType = model.TransactionType.income;
+      } else {
+        // Tab 2: Loan — infer subtype from category name
+        final cat = _selectedCategory.trim().toLowerCase();
+        if (cat.contains('cho vay') || cat.contains('trả nợ')) {
+          txType = model.TransactionType.loanOut;
+        } else if (cat.contains('vay') || cat.contains('thu hồi')) {
+          txType = model.TransactionType.loanIn;
+        } else if (cat.contains('nợ')) {
+          txType = model.TransactionType.loanOut;
+        } else {
+          // Last fallback: preserve original type if it was a loan
+          final origType = widget.transaction.type;
+          if (origType == model.TransactionType.loanIn ||
+              origType == model.TransactionType.loanOut) {
+            txType = origType;
+          } else {
+            txType = model.TransactionType.loanOut;
+          }
+        }
+      }
 
       // Create updated transaction (keep original ID and createdAt)
       final updatedTransaction = model.Transaction(

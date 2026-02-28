@@ -403,59 +403,30 @@ class WalletService {
     await wallet.save();
   }
 
-  Future<void> applyTransaction(dynamic transaction) async {
-    // transaction is model.Transaction from models/transaction.dart
-    await init();
-    final String? wid = transaction.walletId;
-    if (wid == null || wid.isEmpty) {
-      throw ArgumentError('Cannot apply transaction without a walletId');
+  Future<void> applyTransaction(
+      String walletId,
+      double amount,
+      TransactionType type,
+      ) async {
+
+    final wallet = await getById(walletId);
+
+    if (wallet == null) return;
+
+    switch (type) {
+
+      case TransactionType.income:
+      case TransactionType.loanIn:
+        wallet.balance += amount;
+        break;
+
+      case TransactionType.expense:
+      case TransactionType.loanOut:
+        wallet.balance -= amount;
+        break;
     }
 
-    final wallet = _box.get(wid);
-    if (wallet == null) {
-      throw StateError(
-        'Wallet with id "$wid" not found when applying transaction',
-      );
-    }
-
-    double delta = 0.0;
-
-    if (transaction.type == TransactionType.income) {
-      delta = transaction.amount;
-    } else if (transaction.type == TransactionType.expense) {
-      delta = -transaction.amount;
-    } else {
-      // Loan type: determine sign by category semantics.
-      final cat = (transaction.category ?? '').trim().toLowerCase();
-
-      // Categories treated as incoming (you receive money): "vay", "thu hồi"/"thu hồi nợ"
-      final incoming = ['vay', 'thu hồi', 'thu'];
-      // Categories treated as outgoing (you give money / lend / repay): "cho vay", "nợ"
-      final outgoing = ['cho vay', 'cho vay ', 'nợ', 'no'];
-
-      bool matched = false;
-      for (final k in incoming) {
-        if (cat.contains(k)) {
-          delta = transaction.amount;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        for (final k in outgoing) {
-          if (cat.contains(k)) {
-            delta = -transaction.amount;
-            matched = true;
-            break;
-          }
-        }
-      }
-
-      // Default: treat loan as neutral (no wallet change) if unsure
-      if (!matched) delta = 0.0;
-    }
-
-    await updateBalance(wallet.id, delta);
+    await update(wallet);
   }
 
   Future<void> revertTransaction(dynamic transaction) async {
@@ -467,35 +438,16 @@ class WalletService {
 
     double delta = 0.0;
 
-    if (transaction.type == TransactionType.income) {
-      delta = -transaction.amount;
-    } else if (transaction.type == TransactionType.expense) {
-      delta = transaction.amount;
-    } else {
-      // Reverse loan semantics same as applyTransaction but inverted
-      final cat = (transaction.category ?? '').trim().toLowerCase();
-      final incoming = ['vay', 'thu hồi', 'thu'];
-      final outgoing = ['cho vay', 'cho vay ', 'nợ', 'no'];
-
-      bool matched = false;
-      for (final k in incoming) {
-        if (cat.contains(k)) {
-          delta = -transaction.amount;
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        for (final k in outgoing) {
-          if (cat.contains(k)) {
-            delta = transaction.amount;
-            matched = true;
-            break;
-          }
-        }
-      }
-
-      if (!matched) delta = 0.0;
+    // Revert = inverse of applyTransaction, using TransactionType enum directly
+    switch (transaction.type as TransactionType) {
+      case TransactionType.income:
+      case TransactionType.loanIn:
+        delta = -transaction.amount;
+        break;
+      case TransactionType.expense:
+      case TransactionType.loanOut:
+        delta = transaction.amount;
+        break;
     }
 
     await updateBalance(wallet.id, delta);
@@ -516,33 +468,16 @@ class WalletService {
       if (tx.walletId == null || tx.walletId!.isEmpty) continue;
       balances[tx.walletId!] = balances[tx.walletId!] ?? 0.0;
 
-      if (tx.type == TransactionType.income) {
-        balances[tx.walletId!] = balances[tx.walletId!]! + tx.amount;
-      } else if (tx.type == TransactionType.expense) {
-        balances[tx.walletId!] = balances[tx.walletId!]! - tx.amount;
-      } else if (tx.type == TransactionType.loan) {
-        final cat = (tx.category ?? '').trim().toLowerCase();
-        final incoming = ['vay', 'thu hồi', 'thu'];
-        final outgoing = ['cho vay', 'cho vay ', 'nợ', 'no'];
-
-        bool matched = false;
-        for (final k in incoming) {
-          if (cat.contains(k)) {
-            balances[tx.walletId!] = balances[tx.walletId!]! + tx.amount;
-            matched = true;
-            break;
-          }
-        }
-        if (!matched) {
-          for (final k in outgoing) {
-            if (cat.contains(k)) {
-              balances[tx.walletId!] = balances[tx.walletId!]! - tx.amount;
-              matched = true;
-              break;
-            }
-          }
-        }
-        // If not matched, treat as neutral (no change)
+      // Use TransactionType enum for all types — no fragile category string matching
+      switch (tx.type) {
+        case TransactionType.income:
+        case TransactionType.loanIn:
+          balances[tx.walletId!] = balances[tx.walletId!]! + tx.amount;
+          break;
+        case TransactionType.expense:
+        case TransactionType.loanOut:
+          balances[tx.walletId!] = balances[tx.walletId!]! - tx.amount;
+          break;
       }
 
       // Yield periodically to keep UI responsive when processing many transactions

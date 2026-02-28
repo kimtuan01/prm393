@@ -62,66 +62,85 @@ class _TransactionListWidgetState extends State<TransactionListWidget> {
   }
 
   Widget _buildTransactionItem(model.Transaction transaction) {
-    final isExpense = transaction.type == model.TransactionType.expense;
-    final isIncome = transaction.type == model.TransactionType.income;
 
     Color amountColor;
     String prefix;
 
-    if (isExpense) {
-      amountColor = Colors.red;
-      prefix = '-';
-    } else if (isIncome) {
-      amountColor = Colors.green;
-      prefix = '+';
-    } else {
-      amountColor = Colors.orange;
-      prefix = '';
+    switch (transaction.type) {
+
+      case model.TransactionType.expense:
+        amountColor = Colors.red;
+        prefix = '-';
+        break;
+
+      case model.TransactionType.income:
+        amountColor = Colors.green;
+        prefix = '+';
+        break;
+
+      case model.TransactionType.loanOut:
+        amountColor = Colors.orange;
+        prefix = '-';
+        break;
+
+      case model.TransactionType.loanIn:
+        amountColor = Colors.blue;
+        prefix = '+';
+        break;
     }
 
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ListTile(
-        contentPadding: EdgeInsets.all(12),
+        contentPadding: const EdgeInsets.all(12),
+
         leading: Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: amountColor.withAlpha((0.1 * 255).round()),
+            color: amountColor.withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(_getIconForType(transaction.type), color: amountColor),
+          child: Icon(
+            _getIconForType(transaction.type),
+            color: amountColor,
+          ),
         ),
+
         title: Text(
           transaction.category,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
         ),
+
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
             Text(
               transaction.note?.isNotEmpty == true
                   ? transaction.note!
                   : 'Không có ghi chú',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-                fontStyle: transaction.note?.isNotEmpty == true
-                    ? FontStyle.normal
-                    : FontStyle.italic,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 4),
+
+            const SizedBox(height: 4),
+
             Text(
               DateFormat('dd/MM/yyyy HH:mm').format(transaction.date),
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 12,
+              ),
             ),
           ],
         ),
+
         trailing: Text(
           '$prefix${_currencyFormat.format(transaction.amount)} ₫',
           style: TextStyle(
@@ -138,10 +157,15 @@ class _TransactionListWidgetState extends State<TransactionListWidget> {
     switch (type) {
       case model.TransactionType.expense:
         return Icons.arrow_downward;
+
       case model.TransactionType.income:
         return Icons.arrow_upward;
-      case model.TransactionType.loan:
-        return Icons.swap_horiz;
+
+      case model.TransactionType.loanOut:
+        return Icons.call_made; // tiền đi ra
+
+      case model.TransactionType.loanIn:
+        return Icons.call_received; // tiền đi vào
     }
   }
 }

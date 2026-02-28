@@ -22,13 +22,14 @@ class TransactionItemWidget extends StatelessWidget {
     final categoryColor = CategoryHelper.getCategoryColor(transaction.category);
     final categoryIcon = CategoryHelper.getCategoryIcon(transaction.category);
 
-    final amountText = transaction.type == model.TransactionType.income
+    final isPositive = transaction.type == model.TransactionType.income ||
+        transaction.type == model.TransactionType.loanIn;
+
+    final amountText = isPositive
         ? '+${currencyFormat.format(transaction.amount)}'
         : '-${currencyFormat.format(transaction.amount)}';
 
-    final amountColor = transaction.type == model.TransactionType.income
-        ? Colors.green
-        : Colors.red;
+    final amountColor = isPositive ? Colors.green : Colors.red;
 
     return GestureDetector(
       onTap: onTap,

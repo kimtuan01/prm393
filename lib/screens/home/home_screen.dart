@@ -84,90 +84,91 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Get current user ID
       final authService = Provider.of<AuthService>(context, listen: false);
       final userId = authService.currentUser?.id;
 
       if (userId == null || userId.isEmpty) {
-        // User not logged in
         setState(() => _isLoading = false);
         return;
       }
 
-      // Load all transactions for this user
-      _allTransactions = await _transactionService.getAllTransactions(
-        userId: userId,
-      );
+      // Load transactions
+      _allTransactions =
+      await _transactionService.getAllTransactions(userId: userId);
 
-      // Calculate totals
-      _totalIncome = _allTransactions
-          .where((t) => t.type == model.TransactionType.income)
-          .fold<double>(0, (sum, t) => sum + t.amount);
+      // Reset totals
+      _totalIncome = 0;
+      _totalExpense = 0;
 
-      _totalExpense = _allTransactions
-          .where((t) => t.type == model.TransactionType.expense)
-          .fold<double>(0, (sum, t) => sum + t.amount);
+      for (final t in _allTransactions) {
+        switch (t.type) {
+          case model.TransactionType.income:
+            _totalIncome += t.amount;
+            break;
 
-      // Calculate balance (income - expense)
-      _totalBalance = _totalIncome - _totalExpense;
+          case model.TransactionType.expense:
+            _totalExpense += t.amount;
+            break;
 
-      // Prefer canonical wallet-based balance for display (sum of user's wallet balances)
-      try {
-        final walletService = WalletService();
-        final wallets = await walletService.getByUser(userId);
-        if (wallets.isNotEmpty) {
-          final walletSum = wallets.fold<double>(0.0, (s, w) => s + w.balance);
-          _totalBalance = walletSum; // canonical display value
+          case model.TransactionType.loanIn:
+          // không tính vào income
+            break;
+
+          case model.TransactionType.loanOut:
+          // không tính vào expense
+            break;
         }
-      } catch (e) {
-        // If wallet fetch fails for any reason, keep transaction-derived balance
-        debugPrint('⚠️ Error computing wallet balances: $e');
       }
 
-      // Get recent transactions (last 5)
+      // ✅ CHUẨN PRODUCTION: balance lấy từ wallets
+      final walletService = WalletService();
+      final wallets = await walletService.getByUser(userId);
+
+      _totalBalance = wallets.fold(
+        0.0,
+            (sum, wallet) => sum + wallet.balance,
+      );
+
+      // Recent transactions
       final recentList = _allTransactions.toList()
         ..sort((a, b) => b.date.compareTo(a.date));
 
-      // Resolve icon path and color from linked CategoryGroup when possible
       final categoryBox = Hive.box<CategoryGroup>('category_groups');
 
       _recentTransactions = recentList.take(5).map((t) {
-        // Try to find group by id then by name
         CategoryGroup? group;
+
         if (t.categoryId != null && t.categoryId!.isNotEmpty) {
           group = categoryBox.get(t.categoryId);
         }
+
         group ??= categoryBox.values.firstWhere(
-          (g) => g.name.trim().toLowerCase() == t.category.trim().toLowerCase(),
+              (g) => g.name.toLowerCase() == t.category.toLowerCase(),
           orElse: () => CategoryGroup(
             id: '',
             name: t.category,
-            type: t.type == model.TransactionType.expense
-                ? CategoryType.expense
-                : CategoryType.income,
+            type: CategoryType.expense,
             iconKey: 'other',
             colorValue: 0xFF9E9E9E,
             createdAt: DateTime.now(),
           ),
         );
 
-        final asset = CategoryIconMapper.assetForKey(group.iconKey);
-
         return {
           'id': t.id,
           'title': t.category,
           'subtitle': DateFormat('dd/MM/yyyy').format(t.date),
-          'amount': t.type == model.TransactionType.expense
+          'amount': (t.type == model.TransactionType.expense ||
+              t.type == model.TransactionType.loanOut)
               ? -t.amount
               : t.amount,
           'date': DateFormat('dd/MM/yyyy').format(t.date),
-          'iconPath': asset,
+          'iconPath': CategoryIconMapper.assetForKey(group.iconKey),
           'iconKey': group.iconKey,
           'color': Color(group.colorValue),
         };
       }).toList();
 
-      // Calculate monthly expenses for chart (current year)
       _calculateMonthlyExpenses();
     } catch (e) {
       debugPrint('Error loading data: $e');
@@ -485,6 +486,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Center(child: _buildEmptyState())
                     : RecentTransactionsWidget(
                         transactions: _recentTransactions,
+                        onViewAll: () {
+                          setState(() {
+                            _selectedIndex = 1;
+                          });
+                        },
                       ),
 
                 const SizedBox(height: 80), // Space for FAB

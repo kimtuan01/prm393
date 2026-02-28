@@ -109,7 +109,8 @@ class TransactionCategoryView extends StatelessWidget {
                   const SizedBox(height: 12),
                   Column(
                     children: txs.take(4).map((tx) {
-                      final isIncome = tx.type == model.TransactionType.income;
+                      final isIncome = tx.type == model.TransactionType.income ||
+                          tx.type == model.TransactionType.loanIn;
                       final amountText =
                           (isIncome ? '+' : '-') +
                           currencyFormat.format(tx.amount.abs());
@@ -162,7 +163,10 @@ class TransactionCategoryView extends StatelessWidget {
 
   static double _totalAmount(List<model.Transaction> txs) {
     return txs.fold<double>(0, (sum, tx) {
-      final sign = tx.type == model.TransactionType.income ? 1 : -1;
+      final sign = (tx.type == model.TransactionType.income ||
+              tx.type == model.TransactionType.loanIn)
+          ? 1
+          : -1;
       return sum + sign * tx.amount;
     });
   }

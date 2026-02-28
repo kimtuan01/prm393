@@ -21,13 +21,15 @@ class TransactionDayDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate day balance (income - expense)
+    // Calculate day balance (income + loanIn - expense - loanOut)
     final totalIncome = transactions
-        .where((t) => t.type == model.TransactionType.income)
+        .where((t) => t.type == model.TransactionType.income ||
+            t.type == model.TransactionType.loanIn)
         .fold<double>(0, (sum, t) => sum + t.amount);
 
     final totalExpense = transactions
-        .where((t) => t.type == model.TransactionType.expense)
+        .where((t) => t.type == model.TransactionType.expense ||
+            t.type == model.TransactionType.loanOut)
         .fold<double>(0, (sum, t) => sum + t.amount);
 
     final dayBalance = totalIncome - totalExpense;

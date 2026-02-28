@@ -38,7 +38,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         widget.user.id,
       );
 
-      // Calculate totals
+      // Calculate totals (include loan types in balance)
       _totalIncome = _transactions
           .where((t) => t.type == model.TransactionType.income)
           .fold<double>(0, (sum, t) => sum + t.amount);
@@ -47,7 +47,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           .where((t) => t.type == model.TransactionType.expense)
           .fold<double>(0, (sum, t) => sum + t.amount);
 
-      _balance = _totalIncome - _totalExpense;
+      final totalLoanIn = _transactions
+          .where((t) => t.type == model.TransactionType.loanIn)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      final totalLoanOut = _transactions
+          .where((t) => t.type == model.TransactionType.loanOut)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      _balance = (_totalIncome + totalLoanIn) - (_totalExpense + totalLoanOut);
 
       // Sort by date desc
       _transactions.sort((a, b) => b.date.compareTo(a.date));
@@ -375,7 +383,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   }
 
   Widget _buildTransactionItem(model.Transaction transaction) {
-    final isExpense = transaction.type == model.TransactionType.expense;
+    final isExpense = transaction.type == model.TransactionType.expense|| transaction.type == model.TransactionType.loanOut;
     return Card(
       margin: EdgeInsets.only(bottom: 8),
       elevation: 1,

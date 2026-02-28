@@ -6,8 +6,13 @@ import '../../utils/category_icon_mapper.dart';
 
 class RecentTransactionsWidget extends StatelessWidget {
   final List<Map<String, dynamic>> transactions;
+  final VoidCallback? onViewAll;
 
-  const RecentTransactionsWidget({super.key, required this.transactions});
+  const RecentTransactionsWidget({
+    super.key,
+    required this.transactions,
+    this.onViewAll,
+  });
 
   String _formatCurrency(double amount) {
     final formatter = NumberFormat('#,##0', 'vi_VN');
@@ -70,9 +75,7 @@ class RecentTransactionsWidget extends StatelessWidget {
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             TextButton(
-              onPressed: () {
-                // Navigate to all transactions
-              },
+              onPressed: onViewAll,
               child: Text(
                 'Xem tất cả',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

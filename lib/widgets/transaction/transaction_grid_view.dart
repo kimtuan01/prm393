@@ -44,7 +44,8 @@ class TransactionGridView extends StatelessWidget {
       itemCount: transactions.length,
       itemBuilder: (context, index) {
         final tx = transactions[index];
-        final isIncome = tx.type == model.TransactionType.income;
+        final isIncome = tx.type == model.TransactionType.income ||
+            tx.type == model.TransactionType.loanIn;
         final amountText =
             (isIncome ? '+' : '-') + currencyFormat.format(tx.amount.abs());
         final dateStr = DateFormat('dd/MM/yyyy').format(tx.date);

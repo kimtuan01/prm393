@@ -110,5 +110,8 @@ enum TransactionType {
   income, // Khoản thu
 
   @HiveField(2)
-  loan, // Vay/Nợ
+  loanOut, // Cho vay - trừ tiền
+
+  @HiveField(3)
+  loanIn, // Đi vay -> Cộng tiền
 }
