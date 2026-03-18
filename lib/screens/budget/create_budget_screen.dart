@@ -27,6 +27,7 @@ class CreateBudgetScreen extends StatefulWidget {
 class _CreateBudgetScreenState extends State<CreateBudgetScreen> {
   String _selectedCategory = 'Ăn uống';
   double _amount = 0.0;
+  late final TextEditingController _amountController;
   String _note = '';
   bool _repeatBudget = false;
   DateTime _periodStart = DateTime(
@@ -49,8 +50,33 @@ class _CreateBudgetScreenState extends State<CreateBudgetScreen> {
   @override
   void initState() {
     super.initState();
+    _amountController = TextEditingController();
     _loadCategories();
     _loadWallets();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _onAmountChanged(String value) {
+    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+    final formatted = digitsOnly.isEmpty
+        ? ''
+        : NumberFormat('#,##0', 'en_US').format(int.parse(digitsOnly));
+
+    if (formatted != value) {
+      _amountController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+
+    setState(() {
+      _amount = digitsOnly.isEmpty ? 0.0 : double.parse(digitsOnly);
+    });
   }
 
   Future<void> _loadCategories() async {
@@ -594,9 +620,7 @@ class _CreateBudgetScreenState extends State<CreateBudgetScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextFormField(
-                              initialValue: _amount == 0
-                                  ? ''
-                                  : NumberFormat('#,##0').format(_amount),
+                              controller: _amountController,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
@@ -607,14 +631,7 @@ class _CreateBudgetScreenState extends State<CreateBudgetScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.green,
                               ),
-                              onChanged: (value) {
-                                final clean = value
-                                    .replaceAll('.', '')
-                                    .replaceAll(',', '');
-                                setState(
-                                  () => _amount = double.tryParse(clean) ?? 0.0,
-                                );
-                              },
+                              onChanged: _onAmountChanged,
                             ),
                           ),
                         ],

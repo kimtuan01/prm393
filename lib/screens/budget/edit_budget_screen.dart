@@ -27,6 +27,7 @@ class EditBudgetScreen extends StatefulWidget {
 class _EditBudgetScreenState extends State<EditBudgetScreen> {
   late String _selectedCategory;
   late double _amount;
+  late final TextEditingController _amountController;
   late String _note;
   late DateTime _periodStart;
   late DateTime _periodEnd;
@@ -53,9 +54,37 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
 
     // Initialize the note controller once to avoid recreating it on each build
     _noteController = TextEditingController(text: _note);
+    _amountController = TextEditingController(
+      text: NumberFormat('#,##0', 'en_US').format(_amount),
+    );
 
     _loadCategories();
     _loadWallets();
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _onAmountChanged(String value) {
+    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+    final formatted = digitsOnly.isEmpty
+        ? ''
+        : NumberFormat('#,##0', 'en_US').format(int.parse(digitsOnly));
+
+    if (formatted != value) {
+      _amountController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+
+    setState(() {
+      _amount = digitsOnly.isEmpty ? 0.0 : double.parse(digitsOnly);
+    });
   }
 
   Future<void> _loadCategories() async {
@@ -589,9 +618,7 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextFormField(
-                              initialValue: NumberFormat(
-                                '#,##0',
-                              ).format(_amount),
+                              controller: _amountController,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
@@ -602,14 +629,7 @@ class _EditBudgetScreenState extends State<EditBudgetScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.green,
                               ),
-                              onChanged: (value) {
-                                final clean = value
-                                    .replaceAll('.', '')
-                                    .replaceAll(',', '');
-                                setState(
-                                  () => _amount = double.tryParse(clean) ?? 0.0,
-                                );
-                              },
+                              onChanged: _onAmountChanged,
                             ),
                           ),
                         ],
