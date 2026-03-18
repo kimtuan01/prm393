@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/auth/auth_service.dart';
-import '../debug/debug_screen.dart';
 import '../auth/login_screen.dart';
 import 'user_management_screen.dart';
 import '../../utils/category_seed.dart';
@@ -98,23 +96,6 @@ class AdminHomeScreen extends StatelessWidget {
 
             SizedBox(height: 16),
 
-            // Database Management Card
-            _buildMenuCard(
-              context,
-              icon: Icons.storage,
-              title: 'Quản lý Database',
-              subtitle: 'Xem và quản lý dữ liệu Hive',
-              color: Colors.blue,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DebugScreen()),
-                );
-              },
-            ),
-
-            SizedBox(height: 12),
-
             // User Management Card
             _buildMenuCard(
               context,
@@ -134,23 +115,6 @@ class AdminHomeScreen extends StatelessWidget {
 
             SizedBox(height: 12),
 
-            // Transaction Management Card
-            _buildMenuCard(
-              context,
-              icon: Icons.receipt_long,
-              title: 'Quản lý Transactions',
-              subtitle: 'Xem và quản lý giao dịch',
-              color: Colors.orange,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DebugScreen()),
-                );
-              },
-            ),
-
-            SizedBox(height: 12),
-
             // Seed System Categories (Admin)
             _buildMenuCard(
               context,
@@ -160,19 +124,6 @@ class AdminHomeScreen extends StatelessWidget {
               color: Colors.purple,
               onTap: () => _confirmAndSeed(context),
             ),
-
-            const SizedBox(height: 12),
-
-            // Reset system categories (DEV only)
-            if (kDebugMode)
-              _buildMenuCard(
-                context,
-                icon: Icons.restart_alt,
-                title: 'Reset danh mục hệ thống (DEV)',
-                subtitle: 'Xóa và seed lại các danh mục hệ thống (chỉ DEV)',
-                color: Colors.redAccent,
-                onTap: () => _confirmAndReset(context),
-              ),
 
             SizedBox(height: 32),
 
@@ -251,8 +202,6 @@ class AdminHomeScreen extends StatelessWidget {
       barrierDismissible: false,
       builder: (context) => Center(child: CircularProgressIndicator()),
     );
-
-    // Nothing else to change; _confirmAndReset will handle reset flows if invoked separately.
 
     try {
       final added = await CategorySeed.seedIfNeeded();
@@ -404,80 +353,4 @@ class AdminHomeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmAndReset(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Reset danh mục hệ thống (DEV)'),
-        content: Text(
-          'Chỉ dùng trong môi trường DEV. Xóa và seed lại các danh mục hệ thống?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Tiếp tục'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final navigator = Navigator.of(context);
-    // ignore: use_build_context_synchronously
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final removedAndAdded = await CategorySeed.resetSystemCategoriesForDev();
-      if (!context.mounted) return;
-      navigator.pop();
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Reset hoàn tất'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Đã xóa và seed lại các danh mục hệ thống.'),
-                const SizedBox(height: 8),
-                ...removedAndAdded.map((n) => Text('• $n')),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đóng'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      navigator.pop();
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Lỗi'),
-          content: Text('Không thể reset danh mục: $e'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đóng'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
 }

@@ -5,6 +5,8 @@ import '../../config/theme.dart';
 import '../../models/user.dart';
 import '../../models/transaction.dart' as model;
 import '../../services/data/transaction_service.dart';
+import '../../services/firebase/firebase_user_repository.dart';
+import '../../services/firebase/firebase_transaction_repository.dart';
 import 'user_detail_screen.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -18,6 +20,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   List<User> _users = [];
   bool _isLoading = true;
   final TransactionService _transactionService = TransactionService();
+  final FirebaseUserRepository _firebaseUserRepo = FirebaseUserRepository();
+  final FirebaseTransactionRepository _firebaseTransactionRepo =
+      FirebaseTransactionRepository();
 
   @override
   void initState() {
@@ -29,6 +34,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     setState(() => _isLoading = true);
 
     try {
+      await _syncAdminDataFromCloud();
+
       final userBox = await Hive.openBox<User>('users');
       _users = userBox.values.toList();
 
@@ -38,6 +45,29 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       print('Error loading users: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _syncAdminDataFromCloud() async {
+    final users = await _firebaseUserRepo.getAllUsers();
+    if (users.isEmpty) {
+      return;
+    }
+
+    final userBox = await Hive.openBox<User>('users');
+    final transactionBox = await Hive.openBox<model.Transaction>('transactions');
+
+    for (final user in users) {
+      // Keep user lookup consistent with existing auth flow (email key).
+      await userBox.put(user.email, user);
+
+      final cloudTransactions = await _firebaseTransactionRepo.getAllTransactions(
+        user.id,
+      );
+      for (final tx in cloudTransactions) {
+        tx.isSynced = true;
+        await transactionBox.put(tx.id, tx);
+      }
     }
   }
 

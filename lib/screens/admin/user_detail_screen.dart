@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../models/user.dart';
 import '../../models/transaction.dart' as model;
 import '../../services/data/transaction_service.dart';
+import '../../services/firebase/sync_service.dart';
 
 class UserDetailScreen extends StatefulWidget {
   final User user;
@@ -16,6 +17,7 @@ class UserDetailScreen extends StatefulWidget {
 
 class _UserDetailScreenState extends State<UserDetailScreen> {
   final TransactionService _transactionService = TransactionService();
+  final SyncService _syncService = SyncService();
   List<model.Transaction> _transactions = [];
   bool _isLoading = true;
 
@@ -33,6 +35,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
+      await _syncService.downloadFromCloud(widget.user.id);
+
       // Load all transactions for this user
       _transactions = await _transactionService.getTransactionsByUserId(
         widget.user.id,
@@ -328,7 +332,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
                 'Giao dịch (${_transactions.length})',
@@ -337,11 +341,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: AppTheme.textPrimary,
                 ),
-              ),
-              TextButton.icon(
-                onPressed: () => _showDeleteAllDialog(),
-                icon: Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                label: Text('Xóa tất cả', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
@@ -424,49 +423,4 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     );
   }
 
-  void _showDeleteAllDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Xóa tất cả giao dịch?'),
-        content: Text(
-          'Bạn có chắc muốn xóa tất cả ${_transactions.length} giao dịch của user này? Hành động này không thể hoàn tác!',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _deleteAllTransactions();
-            },
-            child: Text('Xóa tất cả', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deleteAllTransactions() async {
-    try {
-      for (var transaction in _transactions) {
-        await _transactionService.deleteTransaction(transaction.id);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã xóa ${_transactions.length} giao dịch'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      _loadUserData();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
 }

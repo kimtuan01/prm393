@@ -57,6 +57,16 @@ class FirebaseUserRepository {
     }
   }
 
+  Future<List<User>> getAllUsers() async {
+    try {
+      final snapshot = await _usersRef.get();
+      return snapshot.docs.map((doc) => _userFromMap(doc.data())).toList();
+    } catch (e) {
+      print('❌ [Firebase] Error getting all users: $e');
+      return [];
+    }
+  }
+
   // ================= DELETE =================
   Future<void> deleteUser(String userId) async {
     try {
