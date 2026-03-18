@@ -63,8 +63,6 @@ dependencies:
   # Gemini AI
   google_generative_ai: ^0.4.6
   flutter_dotenv: ^5.2.1
-  http: ^1.2.2
-  http_parser: ^4.0.2
 
 
 dev_dependencies:

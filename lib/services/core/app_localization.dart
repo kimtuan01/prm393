@@ -63,7 +63,6 @@ class AppStrings {
       'manage_transactions': 'Quản lý giao dịch',
       'categorize_spending': 'Phân loại chi tiêu',
       'view_reports': 'Xem báo cáo',
-      'ocr_receipts': 'Quét hóa đơn OCR',
       'about': 'Về chúng tôi',
       'app_description':
           'Expense Tracker là ứng dụng quản lý tài chính cá nhân giúp bạn theo dõi thu chi, lập ngân sách và phân tích chi tiêu một cách dễ dàng.',
@@ -152,7 +151,6 @@ class AppStrings {
       'manage_transactions': 'Manage Transactions',
       'categorize_spending': 'Categorize Spending',
       'view_reports': 'View Reports',
-      'ocr_receipts': 'OCR Receipt Scanning',
       'about': 'About',
       'app_description':
           'Expense Tracker is a personal finance management app that helps you track income and expenses, create budgets, and analyze spending easily.',

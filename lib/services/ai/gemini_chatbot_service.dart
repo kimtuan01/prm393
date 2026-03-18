@@ -3,13 +3,27 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiChatbotService {
-  late final GenerativeModel _model;
+  GenerativeModel? _model;
   ChatSession? _chatSession;
+  String? _initError;
+
+  bool get isAvailable => _model != null;
+  String? get initError => _initError;
 
   GeminiChatbotService() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    String? apiKey;
+    try {
+      apiKey = dotenv.env['GEMINI_API_KEY'];
+    } catch (e) {
+      _initError = 'Dotenv chưa được khởi tạo: $e';
+      debugPrint('[Chatbot][ERROR] $_initError');
+      return;
+    }
+
     if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('GEMINI_API_KEY not found in .env file');
+      _initError = 'GEMINI_API_KEY not found in .env file';
+      debugPrint('[Chatbot][ERROR] $_initError');
+      return;
     }
 
     _model = GenerativeModel(
@@ -21,12 +35,23 @@ class GeminiChatbotService {
 
   /// Initialize a new chat session
   void startNewSession() {
-    _chatSession = _model.startChat(history: []);
+    if (_model == null) {
+      return;
+    }
+
+    _chatSession = _model!.startChat(history: []);
     debugPrint('[Chatbot] New chat session started');
   }
 
   /// Send a message to the chatbot
   Future<String> sendMessage(String message) async {
+    if (_model == null) {
+      if (_initError != null && _initError!.contains('GEMINI_API_KEY')) {
+        return 'Lỗi: Chưa cấu hình GEMINI_API_KEY trong file .env';
+      }
+      return 'Lỗi: Dịch vụ chatbot chưa sẵn sàng. Vui lòng kiểm tra cấu hình .env và khởi động lại ứng dụng.';
+    }
+
     try {
       if (_chatSession == null) {
         startNewSession();

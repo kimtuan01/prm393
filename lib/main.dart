@@ -111,6 +111,13 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('✅ .env loaded');
+  } catch (e) {
+    debugPrint('⚠️ Failed to load .env: $e');
+  }
+
 
   runApp(const MyApp());
 }

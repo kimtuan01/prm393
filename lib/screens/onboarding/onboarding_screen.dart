@@ -23,8 +23,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'color': Color(0xFF4ECDC4),
     },
     {
-      'title': 'NHẬP CHI HÓA ĐƠN\nTỰ ĐỘNG, DỄ DÀNG',
-      'subtitle': 'Quét mã QR hoặc chụp ảnh hóa đơn để tự động nhập thông tin.',
+      'title': 'GHI CHÉP GIAO DỊCH\nNHANH CHÓNG, RÕ RÀNG',
+      'subtitle': 'Nhập thu chi thủ công với danh mục và ghi chú chi tiết.',
       'icon': Icons.receipt_long_outlined,
       'color': Color(0xFF3498DB),
     },

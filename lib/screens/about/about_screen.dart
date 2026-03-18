@@ -80,7 +80,6 @@ class _AboutScreenState extends State<AboutScreen> {
                     ),
                     _buildListItem(Icons.category, t('categorize_spending')),
                     _buildListItem(Icons.pie_chart, t('view_reports')),
-                    _buildListItem(Icons.camera_alt, t('ocr_receipts')),
                   ],
                 ),
 
