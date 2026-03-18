@@ -61,7 +61,7 @@ class FirebaseTransactionRepository {
       }).toList();
     } catch (e) {
       print('❌ [Firebase] Error getting transactions: $e');
-      return [];
+      rethrow;
     }
   }
 

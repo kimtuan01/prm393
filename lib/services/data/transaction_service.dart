@@ -143,7 +143,7 @@ class TransactionService {
       await walletService.revertTransaction(tx);
 
       // 🌐 CLOUD SYNC: Delete from Firebase asynchronously
-      _syncService.deleteFromCloud(tx);
+      await _syncService.deleteFromCloud(tx);
     }
     await _box!.delete(id);
   }

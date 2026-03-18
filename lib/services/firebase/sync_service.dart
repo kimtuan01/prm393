@@ -6,6 +6,7 @@ import '../../models/budget.dart';
 import '../../models/wallet.dart';
 import '../../models/category_group.dart';
 import '../../models/user.dart';
+import '../data/wallet_service.dart';
 import 'firebase_transaction_repository.dart';
 import 'firebase_budget_repository.dart';
 import 'firebase_wallet_repository.dart';
@@ -17,6 +18,7 @@ import 'firebase_user_repository.dart';
 // ============================================================================
 
 class SyncService {
+  static const String _pendingDeleteBoxName = 'pending_transaction_deletes';
   final FirebaseTransactionRepository _transactionRepo =
       FirebaseTransactionRepository();
   final FirebaseBudgetRepository _budgetRepo = FirebaseBudgetRepository();
@@ -38,7 +40,7 @@ class SyncService {
     stopAutoSync(); // Stop existing timer if any
 
     _syncTimer = Timer.periodic(interval, (_) {
-      syncAllPendingTransactions();
+      fullSync(userId);
     });
 
     print(
@@ -64,6 +66,77 @@ class SyncService {
     }
   }
 
+  Future<Box<Map>> _openPendingDeleteBox() async {
+    if (Hive.isBoxOpen(_pendingDeleteBoxName)) {
+      return Hive.box<Map>(_pendingDeleteBoxName);
+    }
+    return Hive.openBox<Map>(_pendingDeleteBoxName);
+  }
+
+  String _pendingDeleteKey(String userId, String transactionId) {
+    return '$userId::$transactionId';
+  }
+
+  Future<void> queueDeleteTransaction(String userId, String transactionId) async {
+    final box = await _openPendingDeleteBox();
+    await box.put(_pendingDeleteKey(userId, transactionId), {
+      'userId': userId,
+      'transactionId': transactionId,
+      'deletedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<Set<String>> _getPendingDeleteIds(String userId) async {
+    final box = await _openPendingDeleteBox();
+    final ids = <String>{};
+
+    for (final value in box.values) {
+      final uid = value['userId'] as String? ?? '';
+      if (uid != userId) continue;
+      final txId = value['transactionId'] as String? ?? '';
+      if (txId.isNotEmpty) {
+        ids.add(txId);
+      }
+    }
+
+    return ids;
+  }
+
+  Future<void> _syncPendingDeletes({String? userId}) async {
+    final box = await _openPendingDeleteBox();
+
+    final entries = box.toMap().entries.where((entry) {
+      final value = entry.value;
+      final uid = value['userId'] as String? ?? '';
+      return userId == null || uid == userId;
+    }).toList();
+
+    if (entries.isEmpty) {
+      return;
+    }
+
+    print('🧹 [Sync] Processing ${entries.length} pending deletes...');
+
+    for (final entry in entries) {
+      final value = entry.value;
+      final uid = value['userId'] as String? ?? '';
+      final txId = value['transactionId'] as String? ?? '';
+
+      if (uid.isEmpty || txId.isEmpty) {
+        await box.delete(entry.key);
+        continue;
+      }
+
+      try {
+        await _transactionRepo.deleteTransaction(uid, txId);
+        await box.delete(entry.key);
+        print('🗑️ [Sync] Deleted $txId from cloud (queued)');
+      } catch (e) {
+        print('❌ [Sync] Pending delete failed for $txId: $e');
+      }
+    }
+  }
+
   // ================= SYNC PENDING TRANSACTIONS =================
   Future<void> syncAllPendingTransactions() async {
     if (_isSyncing) {
@@ -79,6 +152,8 @@ class SyncService {
     _isSyncing = true;
 
     try {
+      await _syncPendingDeletes();
+
       final box = await Hive.openBox<Transaction>('transactions');
       final pendingTransactions = box.values.where((t) => !t.isSynced).toList();
 
@@ -206,11 +281,18 @@ class SyncService {
         userId,
       );
       final box = await Hive.openBox<Transaction>('transactions');
+      final cloudIds = cloudTransactions.map((t) => t.id).toSet();
+      final pendingDeleteIds = await _getPendingDeleteIds(userId);
 
       print('📥 [Sync] Downloaded ${cloudTransactions.length} transactions');
 
       // Merge with local data (conflict resolution: newest wins)
       for (var cloudTrans in cloudTransactions) {
+        // Ignore transactions pending deletion on this device to avoid resurrecting them.
+        if (pendingDeleteIds.contains(cloudTrans.id)) {
+          continue;
+        }
+
         final localTrans = box.get(cloudTrans.id);
 
         if (localTrans == null) {
@@ -226,6 +308,29 @@ class SyncService {
             print('🔄 [Sync] Updated ${cloudTrans.id} from cloud');
           }
         }
+      }
+
+      // If a transaction is missing from cloud but exists locally as synced,
+      // treat it as deleted on another device and remove it locally.
+      var removedCount = 0;
+      final localUserTransactions = box.values
+          .where((t) => t.userId == userId)
+          .toList();
+
+      for (final localTrans in localUserTransactions) {
+        final missingOnCloud = !cloudIds.contains(localTrans.id);
+        if (missingOnCloud && localTrans.isSynced) {
+          await box.delete(localTrans.id);
+          removedCount++;
+          print('🗑️ [Sync] Removed ${localTrans.id} (deleted from cloud)');
+        }
+      }
+
+      if (removedCount > 0) {
+        final walletService = WalletService();
+        final remaining = box.values.where((t) => t.userId == userId).toList();
+        await walletService.recomputeAllBalances(remaining);
+        print('✅ [Sync] Removed $removedCount stale local transactions');
       }
 
       print('✅ [Sync] Download completed');
@@ -331,12 +436,16 @@ class SyncService {
 
     print('🔄 [Sync] Starting full sync for user $userId...');
 
+    // 0. Push queued deletes first to avoid deleted data being pulled back.
+    await _syncPendingDeletes(userId: userId);
+
     // 1. Download all data from cloud first
     await downloadAllUserData(userId);
 
     // 2. Upload pending changes
     await syncAllPendingTransactions();
     await syncAllUserData(userId);
+    await _syncPendingDeletes(userId: userId);
 
     print('✅ [Sync] Full sync completed');
   }
@@ -355,6 +464,7 @@ class SyncService {
 
     try {
       int transactionCount = 0;
+      int deletedTransactionCount = 0;
       int budgetCount = 0;
       int walletCount = 0;
       int categoryCount = 0;
@@ -364,10 +474,27 @@ class SyncService {
       final userTransactions = transactionBox.values
           .where((t) => t.userId == userId)
           .toList();
+      final localTransactionIds = userTransactions.map((t) => t.id).toSet();
       if (userTransactions.isNotEmpty) {
         await _transactionRepo.saveTransactions(userTransactions);
+        for (final trans in userTransactions) {
+          trans.isSynced = true;
+          await trans.save();
+        }
         transactionCount = userTransactions.length;
         print('✅ [Sync] Uploaded $transactionCount transactions');
+      }
+
+      // Mirror local deletion state: remove cloud transactions that no longer exist locally.
+      final cloudTransactions = await _transactionRepo.getAllTransactions(userId);
+      for (final cloudTrans in cloudTransactions) {
+        if (!localTransactionIds.contains(cloudTrans.id)) {
+          await _transactionRepo.deleteTransaction(userId, cloudTrans.id);
+          deletedTransactionCount++;
+        }
+      }
+      if (deletedTransactionCount > 0) {
+        print('🗑️ [Sync] Deleted $deletedTransactionCount stale cloud transactions');
       }
 
       // Upload Budgets
@@ -415,13 +542,14 @@ class SyncService {
       }
 
       final message =
-          'Đã upload: $transactionCount giao dịch, $budgetCount ngân sách, $walletCount ví, $categoryCount danh mục';
+          'Đã upload: $transactionCount giao dịch, xóa cloud $deletedTransactionCount giao dịch, $budgetCount ngân sách, $walletCount ví, $categoryCount danh mục';
       print('✅ [Sync] $message');
 
       return {
         'success': true,
         'message': message,
         'transactions': transactionCount,
+        'deletedTransactions': deletedTransactionCount,
         'budgets': budgetCount,
         'wallets': walletCount,
         'categories': categoryCount,
@@ -435,17 +563,16 @@ class SyncService {
   // ================= DELETE FROM CLOUD =================
   /// Delete transaction from Firebase
   Future<void> deleteFromCloud(Transaction transaction) async {
+    await queueDeleteTransaction(transaction.userId, transaction.id);
+
     if (!await hasInternet()) {
       print('📶 [Sync] No internet, delete will sync later');
       return;
     }
 
     try {
-      await _transactionRepo.deleteTransaction(
-        transaction.userId,
-        transaction.id,
-      );
-      print('🗑️ [Sync] Deleted ${transaction.id} from cloud');
+      await _syncPendingDeletes(userId: transaction.userId);
+      print('🗑️ [Sync] Delete request synced for ${transaction.id}');
     } catch (e) {
       print('❌ [Sync] Error deleting from cloud: $e');
     }
